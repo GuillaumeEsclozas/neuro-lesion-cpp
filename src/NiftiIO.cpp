@@ -14,13 +14,12 @@ bool has_gz_extension(const std::string& path) {
     return path.compare(path.size() - 3, 3, ".gz") == 0;
 }
 
-/* Convert raw bytes of any supported NIfTI datatype to float. */
 std::vector<float> convert_to_float(const void* raw, size_t nvox, int16_t datatype,
                                      float slope, float intercept)
 {
     std::vector<float> out(nvox);
 
-    // slope of 0 means "unset" per the NIfTI spec
+    // slope=0 means unset
     if (slope == 0.0f) { slope = 1.0f; intercept = 0.0f; }
 
     switch (datatype) {
@@ -94,9 +93,8 @@ NiftiVolume nifti::load(const std::string& filepath) {
         throw std::runtime_error("Invalid NIfTI header (sizeof_hdr != 348): " + filepath);
     }
 
-    // Seek past any extension padding to get to the voxel data
     long vox_offset = static_cast<long>(hdr.vox_offset);
-    if (vox_offset < 352) vox_offset = 352; // minimum for single-file .nii
+    if (vox_offset < 352) vox_offset = 352;
     znzseek(fp, vox_offset, SEEK_SET);
 
     int nx = hdr.dim[1];
@@ -184,7 +182,7 @@ void nifti::save(const std::string& filepath, const NiftiVolume& vol) {
 
     znzwrite(&hdr, sizeof(hdr), 1, fp);
 
-    // 4-byte extension block (all zeros = no extensions)
+    // no extensions
     char ext[4] = {0, 0, 0, 0};
     znzwrite(ext, 1, 4, fp);
 
@@ -211,7 +209,7 @@ void nifti::save_labels(const std::string& filepath, const std::vector<int>& lab
     hdr.pixdim[2] = reference.dy;
     hdr.pixdim[3] = reference.dz;
     hdr.vox_offset = 352.0f;
-    hdr.scl_slope  = 0.0f;  /* unset, raw values */
+    hdr.scl_slope  = 0.0f;
     hdr.scl_inter  = 0.0f;
     hdr.xyzt_units = NIFTI_UNITS_MM;
     hdr.intent_code = NIFTI_INTENT_LABEL;
@@ -239,7 +237,6 @@ void nifti::save_labels(const std::string& filepath, const std::vector<int>& lab
     char ext[4] = {0, 0, 0, 0};
     znzwrite(ext, 1, 4, fp);
 
-    // pack int labels down to uint8
     std::vector<uint8_t> buf(labels.size());
     for (size_t i = 0; i < labels.size(); i++)
         buf[i] = static_cast<uint8_t>(std::clamp(labels[i], 0, 255));
