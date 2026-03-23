@@ -70,3 +70,9 @@ cd build
 ## References
 
 B.H. Menze et al. The Multimodal Brain Tumor Image Segmentation Benchmark (BraTS). IEEE TMI, 34(10):1993-2024, 2015.
+
+##Limits to this repo
+
+Tested on 5 BraTS 2020 training cases to make sure the C++ output matches
+the Python version. Model performance on unseen data is in `training/`
+(mean foreground Dice 0.7317 on the full validation split).
