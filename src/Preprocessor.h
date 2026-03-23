@@ -4,10 +4,7 @@
 #include <vector>
 #include <array>
 
-/*
- * A patch is a dense [C, D, H, W] tensor stored flat, plus the (x, y, z)
- * corner in the original volume so we know where to put results back.
- */
+
 struct Patch {
     std::vector<float> data;   /* C * pD * pH * pW floats */
     int origin_x, origin_y, origin_z;
@@ -26,12 +23,6 @@ struct PatchGrid {
 class Preprocessor {
 public:
     explicit Preprocessor(int patch_size = 128, float overlap = 0.5f);
-
-    /*
-     * Full preprocessing: takes 4 modality volumes, normalizes each (z-score
-     * on nonzero voxels), stacks them into a [4, D, H, W] tensor, then
-     * extracts sliding-window patches with the configured overlap.
-     */
     PatchGrid run(const std::array<NiftiVolume, 4>& modalities);
 
     /* Normalize a single volume in-place: z-score on nonzero voxels. */
