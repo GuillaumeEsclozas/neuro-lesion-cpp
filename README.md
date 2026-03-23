@@ -1,18 +1,19 @@
 # neuro-lesion-cpp
 
-C++ inference pipeline for 3D brain lesion segmentation from multi-modal MRI. Takes four NIfTI volumes (FLAIR, T1, T1ce, T2) and an ONNX model, produces a segmentation mask in NIfTI format. Built for BraTS 2020 conventions.
+Inference pipeline for 3D brain lesion segmentation from multi-modal MRI volumes. Written in C++17, uses ONNX Runtime for model inference. No Python, OpenCV or ITK dependency at runtime.
 
 ![Segmentation example](image/brain.png)
 
 ## Dependencies
 
-This code requires C++17, CMake 3.18+ and zlib. ONNX Runtime 1.17+ is fetched automatically by CMake via FetchContent. No OpenCV, no ITK, no Python runtime required at inference time.
+- C++17 compiler (GCC 8+, Clang 7+, MSVC 2019+)
+- CMake 3.18+
+- zlib
+- ONNX Runtime 1.17+ (fetched automatically by CMake)
 
-The ONNX model is not included. You need to provide your own (see the `training/` directory for instructions on how to produce one from BraTS 2020 data using PyTorch).
+## Model
 
-## Model expectations
-
-The pipeline expects an ONNX model (opset 17) with input shape `[batch, 4, 128, 128, 128]` (FLAIR, T1, T1ce, T2) and output shape `[batch, 4, 128, 128, 128]` (background, NCR/NET, edema, enhancing tumor). The companion training notebook produces a 21.4 MB model with 5.6M parameters trained for 200 epochs with Dice + cross entropy loss and mixed precision.
+The pipeline expects an ONNX model (opset 17) with input `[batch, 4, 128, 128, 128]` (FLAIR, T1, T1ce, T2) and output `[batch, 4, 128, 128, 128]` (background, NCR/NET, edema, enhancing tumor). The model is not shipped with this repository. A companion Colab notebook trains a lightweight 3D U-Net (5.6M parameters, Dice + CE loss, mixed precision, 200 epochs) on BraTS 2020 and exports to ONNX. The exported model is 21.4 MB.
 
 ## Building
 ```bash
@@ -21,56 +22,36 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 cmake --build . --parallel
 ```
 
-On Windows with Visual Studio:
-```bash
-cmake -B build -G "Visual Studio 17 2022" -A x64
-cmake --build build --config Release
-```
+## Usage
 
-## Running
-
-Place the four BraTS modality files in a single directory. The pipeline identifies them by filename (looks for `_flair`, `_t1`, `_t1ce`, `_t2` substrings).
+The four BraTS modality files must be in a single directory. The pipeline identifies them by filename substring (`_flair`, `_t1`, `_t1ce`, `_t2`).
 ```bash
 ./brain_lesion_seg \
     --input-dir /data/BraTS20_Training_001 \
     --output /results/seg_001.nii \
-    --model models/brats_unet3d.onnx \
+    --model /path/to/brats_unet3d.onnx \
     --device cpu \
     --patch-overlap 0.5 \
     --min-component-size 100
 ```
 
-`--device` accepts `cpu` or `cuda`. `--patch-overlap` controls the fraction of overlap between adjacent 128^3 patches (default 0.5). `--min-component-size` removes connected components smaller than this many voxels (default 100).
-
-Full volumes (typically 240x240x160) are processed via sliding window. Overlapping regions are averaged before softmax to reduce boundary artifacts.
+`--device` accepts `cpu` or `cuda`. `--patch-overlap` controls overlap between adjacent 128^3 patches. `--min-component-size` removes connected components below this voxel count.
 
 ## Pipeline
-```
-NIfTI files (.nii/.nii.gz)
-    |
-    v
-NiftiIO::load()           Load 4 modalities, convert to float
-    |
-    v
-Preprocessor::run()       Z-score normalize (nonzero voxels), stack to [4,D,H,W],
-    |                     sliding window patch extraction with overlap
-    v
-InferenceEngine           ONNX Runtime session (CPU or CUDA),
-    |                     run each 128^3 patch through the model
-    v
-Postprocessor::run()      Average overlapping logits, softmax, argmax,
-    |                     connected component filtering (BFS flood fill),
-    v                     volume thresholding
-NiftiIO::save_labels()    Write segmentation mask preserving original affine
-```
+
+NiftiIO::load()          Load 4 modalities from NIfTI, convert to float
+Preprocessor::run()      Z-score normalize nonzero voxels, sliding window patch extraction
+InferenceEngine          ONNX Runtime session, run each patch
+Postprocessor::run()     Average overlapping logits, softmax, argmax, BFS flood fill filtering
+NiftiIO::save_labels()   Write mask as NIfTI preserving original affine
 
 ## Output labels
 
-Following BraTS conventions: 0 background, 1 NCR/NET (necrotic and non-enhancing tumor core), 2 peritumoral edema, 3 GD-enhancing tumor.
+0 background, 1 NCR/NET, 2 peritumoral edema, 3 GD-enhancing tumor.
 
 ## Validation
 
-Tested on 5 BraTS 2020 training subjects. The model was validated on the full BraTS validation set in Python (see `training/`).
+Tested on 5 BraTS 2020 training subjects to verify pipeline correctness against the Python reference. For model performance on unseen data, the training notebook reports mean foreground Dice 0.7317 on the full validation set.
 
 | Subject | NCR/NET | Edema  | Enhancing | Time (s) |
 |---------|---------|--------|-----------|----------|
@@ -81,28 +62,15 @@ Tested on 5 BraTS 2020 training subjects. The model was validated on the full Br
 | 005     | 0.4682  | 0.4136 | 0.7122    | 430.1    |
 | Mean    | 0.7142  | 0.7606 | 0.8391    | 436.6    |
 
-Mean inference time per volume: ~7.3 minutes on a single CPU thread (Intel Xeon @ 2.2GHz, ONNX Runtime 1.17.1). CUDA execution provider reduces this significantly.
+Mean time per volume: ~7.3 min on CPU (Intel Xeon @ 2.2GHz, single thread, ONNX Runtime 1.17.1).
 
 ## Tests
-
-Unit tests cover normalization edge cases, patch extraction at volume boundaries, softmax, argmax, and connected component filtering. No model or data needed.
 ```bash
 cd build
-ctest --output-on-failure
+./test_preprocessor
+./test_postprocessor
 ```
 
 ## References
 
-The training data comes from the BraTS 2020 challenge. If you use this pipeline or the companion model, please cite:
-
 B.H. Menze et al. The Multimodal Brain Tumor Image Segmentation Benchmark (BraTS). IEEE TMI, 34(10):1993-2024, 2015.
-
-## License
-
-Pipeline code is provided as is. The ONNX model and training data are subject to the BraTS 2020 challenge license terms.
-
-## Limits to this repo
-
-Tested on 5 BraTS 2020 **training** subjects to verify C++ pipeline correctness against the Python reference. For model performance on unseen data, see the validation results in `training/` (mean foreground Dice 0.7317 on the full validation set).
-
-
