@@ -1,74 +1,70 @@
 # neuro-lesion-cpp
 
-Inference pipeline for 3D brain lesion segmentation from multi-modal MRI volumes. Written in C++17, uses ONNX Runtime for model inference. No Python, OpenCV or ITK dependency at runtime.
+C++ inference pipeline for 3D brain lesion segmentation (BraTS 2020). 
+Runs ONNX models on multi-modal MRI without Python at runtime.
 
-![Segmentation example](image/brain.png)
+![](image/brain.png)
 
-## Dependencies
+## Quick start
 
-- C++17 compiler (GCC 8+, Clang 7+, MSVC 2019+)
-- CMake 3.18+
-- zlib
-- ONNX Runtime 1.17+ (fetched automatically by CMake)
+You need a C++17 compiler, CMake 3.18+, and zlib. ONNX Runtime is pulled 
+automatically during the build.
 
-## Model
+    mkdir build && cd build
+    cmake .. -DCMAKE_BUILD_TYPE=Release
+    cmake --build . --parallel
 
-The pipeline expects an ONNX model (opset 17) with input `[batch, 4, 128, 128, 128]` (FLAIR, T1, T1ce, T2) and output `[batch, 4, 128, 128, 128]` (background, NCR/NET, edema, enhancing tumor). The model is not shipped with this repository. A companion Colab notebook trains a lightweight 3D U-Net (5.6M parameters, Dice + CE loss, mixed precision, 200 epochs) on BraTS 2020 and exports to ONNX. The exported model is 21.4 MB.
+The model is not included. I trained a 3D U-Net on BraTS 2020 in a Colab 
+notebook and exported it to ONNX (opset 17). Input shape is 
+[batch, 4, 128, 128, 128] (FLAIR/T1/T1ce/T2), output is 
+[batch, 4, 128, 128, 128] (background + 3 tumor subregions).
 
-## Building
-```bash
-mkdir build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-cmake --build . --parallel
-```
+## Running
 
-## Usage
+Point it at a directory containing the four BraTS modality files 
+(identified by `_flair`, `_t1`, `_t1ce`, `_t2` in the filename):
 
-The four BraTS modality files must be in a single directory. The pipeline identifies them by filename substring (`_flair`, `_t1`, `_t1ce`, `_t2`).
-```bash
-./brain_lesion_seg \
-    --input-dir /data/BraTS20_Training_001 \
-    --output /results/seg_001.nii \
-    --model /path/to/brats_unet3d.onnx \
-    --device cpu \
-    --patch-overlap 0.5 \
-    --min-component-size 100
-```
+    ./brain_lesion_seg \
+        --input-dir /data/BraTS20_Training_001 \
+        --output /results/seg_001.nii \
+        --model /path/to/brats_unet3d.onnx
 
-`--device` accepts `cpu` or `cuda`. `--patch-overlap` controls overlap between adjacent 128^3 patches. `--min-component-size` removes connected components below this voxel count.
+Other flags: `--device cpu|cuda`, `--patch-overlap 0.5`, 
+`--min-component-size 100`.
 
-## Pipeline
+## How it works
 
-NiftiIO::load()          Load 4 modalities from NIfTI, convert to float
-Preprocessor::run()      Z-score normalize nonzero voxels, sliding window patch extraction
-InferenceEngine          ONNX Runtime session, run each patch
-Postprocessor::run()     Average overlapping logits, softmax, argmax, BFS flood fill filtering
-NiftiIO::save_labels()   Write mask as NIfTI preserving original affine
+1. Load the 4 NIfTI volumes, convert to float
+2. Z-score normalize each modality (nonzero voxels only)
+3. Extract overlapping 128^3 patches
+4. Run each patch through ONNX Runtime
+5. Average overlapping logits, softmax, argmax
+6. Remove small connected components (BFS flood fill)
+7. Write the label mask as NIfTI, preserving the original affine
 
-## Output labels
-
-0 background, 1 NCR/NET, 2 peritumoral edema, 3 GD-enhancing tumor.
+Output labels: 0 = background, 1 = NCR/NET, 2 = edema, 3 = enhancing.
 
 ## Validation
 
-Tested on 5 BraTS 2020 training subjects to verify pipeline correctness against the Python reference. For model performance on unseen data, the training notebook reports mean foreground Dice 0.7317 on the full validation set.
+Tested on 5 BraTS 2020 training cases to check C++ vs Python agreement. 
+The model itself gets ~0.73 mean Dice on the full validation split 
+(nothing crazy, it's a small U-Net).
 
-| Subject | NCR/NET | Edema  | Enhancing | Time (s) |
-|---------|---------|--------|-----------|----------|
-| 001     | 0.8563  | 0.8811 | 0.8889    | 438.6    |
-| 002     | 0.8912  | 0.8251 | 0.8545    | 439.5    |
-| 003     | 0.6293  | 0.7401 | 0.8513    | 434.3    |
-| 004     | 0.7260  | 0.9429 | 0.8886    | 440.5    |
-| 005     | 0.4682  | 0.4136 | 0.7122    | 430.1    |
-| Mean    | 0.7142  | 0.7606 | 0.8391    | 436.6    |
+| Subject | NCR/NET | Edema | Enhancing | Time (s) |
+|---------|---------|-------|-----------|----------|
+| 001     | 0.856   | 0.881 | 0.889     | 439      |
+| 002     | 0.891   | 0.825 | 0.855     | 440      |
+| 003     | 0.629   | 0.740 | 0.851     | 434      |
+| 004     | 0.726   | 0.943 | 0.889     | 441      |
+| 005     | 0.468   | 0.414 | 0.712     | 430      |
 
-Mean time per volume: ~7.3 min on CPU (Intel Xeon @ 2.2GHz, single thread, ONNX Runtime 1.17.1).
+~7 min per volume on CPU (Xeon @ 2.2GHz, single thread).
 
 ## Tests
-```bash
-cd build
-./test_preprocessor
-./test_postprocessor
+
+    cd build
+    ./test_preprocessor
+    ./test_postprocessor
 ```
 
 ## References
