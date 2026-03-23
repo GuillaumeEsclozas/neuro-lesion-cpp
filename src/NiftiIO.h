@@ -19,7 +19,7 @@ struct NiftiVolume {
     float quatern_b = 0, quatern_c = 0, quatern_d = 0;
     float qoffset_x = 0, qoffset_y = 0, qoffset_z = 0;
 
-    inline size_t nvoxels() const { return (size_t)nx * ny * nz; }
+    inline size_t nvoxels() const { return static_cast<size_t>(nx) * static_cast<size_t>(ny) * static_cast<size_t>(nz); }
     inline float& at(int x, int y, int z) {
         return data[static_cast<size_t>(z) * static_cast<size_t>(ny) * static_cast<size_t>(nx)
                    + static_cast<size_t>(y) * static_cast<size_t>(nx)
