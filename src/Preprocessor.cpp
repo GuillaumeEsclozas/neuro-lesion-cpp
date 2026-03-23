@@ -36,7 +36,7 @@ void Preprocessor::zscore_normalize(NiftiVolume& vol) {
 
 std::vector<float> Preprocessor::stack_modalities(const std::array<NiftiVolume, 4>& vols) {
     int nx = vols[0].nx, ny = vols[0].ny, nz = vols[0].nz;
-    for (int c = 1; c < 4; c++) {
+    for (size_t c = 1; c < 4; c++) {
         if (vols[c].nx != nx || vols[c].ny != ny || vols[c].nz != nz)
             throw std::runtime_error("Modality dimension mismatch at channel " + std::to_string(c));
     }
@@ -44,9 +44,9 @@ std::vector<float> Preprocessor::stack_modalities(const std::array<NiftiVolume, 
     size_t vol_size = static_cast<size_t>(nx) * static_cast<size_t>(ny) * static_cast<size_t>(nz);
     std::vector<float> stacked(4 * vol_size);
 
-    for (int c = 0; c < 4; c++) {
+    for (size_t c = 0; c < 4; c++) {
         std::copy(vols[c].data.begin(), vols[c].data.end(),
-                  stacked.begin() + static_cast<ptrdiff_t>(static_cast<size_t>(c) * vol_size));
+                  stacked.begin() + static_cast<ptrdiff_t>(c * vol_size));
     }
 
     return stacked;
