@@ -13,11 +13,24 @@ The pipeline expects an ONNX model (opset 17) with:
 
 The companion training notebook produces a 21.4 MB model. Expected Dice scores on the BraTS 2020 validation set:
 
-| Region | Dice |
-|--------|------|
-| NCR/NET | 0.73 |
-| Edema (ED) | 0.85 |
-| Enhancing Tumor (ET) | 0.84 |
+| Region | Dice (Python, full val set) | Dice (C++ pipeline, 5 subjects) |
+|--------|---------------------------|--------------------------------|
+| NCR/NET | 0.73 | 0.71 |
+| Edema (ED) | 0.85 | 0.76 |
+| Enhancing Tumor (ET) | 0.84 | 0.84 |
+
+### C++ Pipeline Validation (BraTS 2020 Training Subjects)
+
+| Subject | NCR/NET | Edema  | Enhancing | Time (s) |
+|---------|---------|--------|-----------|----------|
+| 001     | 0.8563  | 0.8811 | 0.8889    | 438.6    |
+| 002     | 0.8912  | 0.8251 | 0.8545    | 439.5    |
+| 003     | 0.6293  | 0.7401 | 0.8513    | 434.3    |
+| 004     | 0.7260  | 0.9429 | 0.8886    | 440.5    |
+| 005     | 0.4682  | 0.4136 | 0.7122    | 430.1    |
+| **Mean**| **0.7142**|**0.7606**|**0.8391**| **436.6**|
+
+Mean inference time per volume: ~7.3 minutes on CPU (Intel Xeon @ 2.2GHz, single thread, ONNX Runtime 1.17.1). GPU inference with the CUDA execution provider reduces this significantly.
 
 Place your `.onnx` file in the `models/` directory.
 
