@@ -1,5 +1,7 @@
 # neuro-lesion-cpp
 
+![CI](https://github.com/GuillaumeEsclozas/neuro-lesion-cpp/actions/workflows/ci.yml/badge.svg)
+
 C++ inference pipeline for 3D brain lesion segmentation (BraTS 2020). 
 Runs ONNX models on multi-modal MRI without Python at runtime.
 
@@ -66,6 +68,20 @@ cd build
 ./test_preprocessor
 ./test_postprocessor
 ```
+
+## CI
+
+Every push runs three parallel jobs via GitHub Actions:
+
+    gcc-13 and clang-17 Release builds with -Wall -Wextra -Wpedantic
+    -Wshadow -Wconversion -Werror
+    
+    Debug build under AddressSanitizer + UndefinedBehaviorSanitizer
+    (leak detection enabled, halt on first error)
+
+ONNX Runtime downloads are cached between runs. Test binaries run
+through ctest with assertions kept active in Release via -UNDEBUG.
+The gcc build uploads a compiled binary as artifact.
 
 ## References
 
