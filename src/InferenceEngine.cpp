@@ -6,7 +6,7 @@ InferenceEngine::InferenceEngine(const std::string& model_path, const std::strin
     : env(std::make_unique<Ort::Env>(ORT_LOGGING_LEVEL_WARNING, "lesion_seg"))
 {
     session_opts.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
-    session_opts.SetIntraOpNumThreads(0); // let ORT pick
+    session_opts.SetIntraOpNumThreads(0);
 
     if (device == "cuda") {
         OrtCUDAProviderOptions cuda_opts{};
@@ -21,8 +21,8 @@ InferenceEngine::InferenceEngine(const std::string& model_path, const std::strin
         std::cerr << "[InferenceEngine] Using CPU execution provider\n";
     }
 
-    // ORT on Windows needs wide strings, on Linux narrow is fine
 #ifdef _WIN32
+    // wide string for Windows
     std::wstring wpath(model_path.begin(), model_path.end());
     session = std::make_unique<Ort::Session>(*env, wpath.c_str(), session_opts);
 #else
@@ -45,11 +45,10 @@ void InferenceEngine::query_io_names() {
     auto out_name = session->GetOutputNameAllocated(0, alloc);
     output_name = out_name.get();
 
-    // Try to read the number of output channels from the model metadata
+    // read num output channels from model shape
     auto out_info = session->GetOutputTypeInfo(0);
     auto tensor_info = out_info.GetTensorTypeAndShapeInfo();
     auto shape = tensor_info.GetShape();
-    // Expected shape: [batch, num_classes, D, H, W]
     if (shape.size() == 5 && shape[1] > 0) {
         out_channels = static_cast<int>(shape[1]);
     }
