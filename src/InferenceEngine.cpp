@@ -22,7 +22,6 @@ InferenceEngine::InferenceEngine(const std::string& model_path, const std::strin
     }
 
 #ifdef _WIN32
-    // wide string for Windows
     std::wstring wpath(model_path.begin(), model_path.end());
     session = std::make_unique<Ort::Session>(*env, wpath.c_str(), session_opts);
 #else
@@ -45,7 +44,6 @@ void InferenceEngine::query_io_names() {
     auto out_name = session->GetOutputNameAllocated(0, alloc);
     output_name = out_name.get();
 
-    // read num output channels from model shape
     auto out_info = session->GetOutputTypeInfo(0);
     auto tensor_info = out_info.GetTensorTypeAndShapeInfo();
     auto shape = tensor_info.GetShape();
@@ -58,7 +56,10 @@ std::vector<float> InferenceEngine::predict(const std::vector<float>& input_patc
                                              int channels, int depth, int height, int width)
 {
     std::array<int64_t, 5> input_shape = {1, channels, depth, height, width};
-    size_t input_count = (size_t)channels * depth * height * width;
+    size_t input_count = static_cast<size_t>(channels)
+                       * static_cast<size_t>(depth)
+                       * static_cast<size_t>(height)
+                       * static_cast<size_t>(width);
 
     if (input_patch.size() != input_count)
         throw std::runtime_error("Input patch size mismatch: expected "
@@ -87,7 +88,7 @@ std::vector<float> InferenceEngine::predict(const std::vector<float>& input_patc
     auto out_shape = output_tensors[0].GetTensorTypeAndShapeInfo().GetShape();
 
     size_t total = 1;
-    for (auto s : out_shape) total *= s;
+    for (auto s : out_shape) total *= static_cast<size_t>(s);
 
     return std::vector<float>(raw, raw + total);
 }
