@@ -19,7 +19,6 @@ std::vector<float> convert_to_float(const void* raw, size_t nvox, int16_t dataty
 {
     std::vector<float> out(nvox);
 
-    // slope=0 means unset
     if (slope == 0.0f) { slope = 1.0f; intercept = 0.0f; }
 
     switch (datatype) {
@@ -182,7 +181,6 @@ void nifti::save(const std::string& filepath, const NiftiVolume& vol) {
 
     znzwrite(&hdr, sizeof(hdr), 1, fp);
 
-    // no extensions
     char ext[4] = {0, 0, 0, 0};
     znzwrite(ext, 1, 4, fp);
 
