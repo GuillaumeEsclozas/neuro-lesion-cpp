@@ -105,8 +105,10 @@ enable_testing()
 
 add_executable(test_preprocessor src/test_preprocessor.cpp)
 target_link_libraries(test_preprocessor PRIVATE lesion_seg_lib)
+target_compile_options(test_preprocessor PRIVATE -UNDEBUG)
 add_test(NAME preprocessor_tests COMMAND test_preprocessor)
 
 add_executable(test_postprocessor src/test_postprocessor.cpp)
 target_link_libraries(test_postprocessor PRIVATE lesion_seg_lib)
+target_compile_options(test_postprocessor PRIVATE -UNDEBUG)
 add_test(NAME postprocessor_tests COMMAND test_postprocessor)
