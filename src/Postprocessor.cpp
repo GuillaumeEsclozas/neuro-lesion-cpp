@@ -18,7 +18,7 @@ std::vector<float> Postprocessor::aggregate_patches(
     std::vector<float> accum(vol_total, 0.0f);
     std::vector<float> counts((size_t)pD * pH * pW, 0.0f);
 
-    int psz = grid.patch_d; // assumes cubic patches
+    int psz = grid.patch_d;
 
     for (size_t pi = 0; pi < grid.patches.size(); pi++) {
         const Patch& patch = grid.patches[pi];
@@ -50,7 +50,7 @@ std::vector<float> Postprocessor::aggregate_patches(
         }
     }
 
-    // Divide by overlap count to get average logits
+    // average over overlap count
     for (int c = 0; c < C; c++) {
         for (size_t i = 0; i < (size_t)pD * pH * pW; i++) {
             if (counts[i] > 0.0f) {
@@ -59,7 +59,7 @@ std::vector<float> Postprocessor::aggregate_patches(
         }
     }
 
-    // Crop back to original volume dimensions
+    // crop back to original dims
     int D = grid.vol_d, H = grid.vol_h, W = grid.vol_w;
     std::vector<float> result((size_t)C * D * H * W);
 
@@ -80,8 +80,7 @@ void Postprocessor::softmax_channels(std::vector<float>& probs, int C, int D, in
     size_t spatial = (size_t)D * H * W;
 
     for (size_t i = 0; i < spatial; i++) {
-        // Find max for numerical stability
-        float max_val = probs[i]; // c=0
+        float max_val = probs[i];
         for (int c = 1; c < C; c++) {
             float v = probs[c * spatial + i];
             if (v > max_val) max_val = v;
@@ -127,7 +126,6 @@ void Postprocessor::filter_small_components(std::vector<int>& labels,
     size_t total = (size_t)D * H * W;
     std::vector<bool> visited(total, false);
 
-    // 6-connected neighborhood offsets
     const int dx[] = {-1, 1,  0, 0,  0, 0};
     const int dy[] = { 0, 0, -1, 1,  0, 0};
     const int dz[] = { 0, 0,  0, 0, -1, 1};
@@ -144,7 +142,6 @@ void Postprocessor::filter_small_components(std::vector<int>& labels,
                 size_t i = idx(x, y, z);
                 if (visited[i] || labels[i] == 0) continue;
 
-                // BFS flood fill for this component
                 int lbl = labels[i];
                 std::vector<size_t> component;
                 bfs_queue.push({x, y, z});
@@ -167,7 +164,7 @@ void Postprocessor::filter_small_components(std::vector<int>& labels,
                     }
                 }
 
-                // Kill components smaller than threshold
+                // kill small blobs
                 if (static_cast<int>(component.size()) < min_size) {
                     for (size_t ci : component)
                         labels[ci] = 0;
