@@ -88,7 +88,7 @@ static std::array<std::string, 4> find_modality_files(const std::string& dir) {
     }
 
     const char* names[] = {"FLAIR", "T1", "T1ce", "T2"};
-    for (int i = 0; i < 4; i++) {
+    for (size_t i = 0; i < 4; i++) {
         if (paths[i].empty()) {
             throw std::runtime_error(std::string("Could not find ") + names[i]
                 + " modality in " + dir);
@@ -108,7 +108,7 @@ int main(int argc, char** argv) {
 
     const char* mod_names[] = {"FLAIR", "T1", "T1ce", "T2"};
     std::array<NiftiVolume, 4> volumes;
-    for (int i = 0; i < 4; i++) {
+    for (size_t i = 0; i < 4; i++) {
         std::cerr << "  Loading " << mod_names[i] << ": " << mod_paths[i] << "\n";
         volumes[i] = nifti::load(mod_paths[i]);
     }
