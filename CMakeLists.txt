@@ -5,6 +5,30 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_C_STANDARD 11)
 
+# --- Compiler warnings (always on) ---
+add_compile_options(
+    $<$<COMPILE_LANGUAGE:CXX>:-Wall>
+    $<$<COMPILE_LANGUAGE:CXX>:-Wextra>
+    $<$<COMPILE_LANGUAGE:CXX>:-Wpedantic>
+    $<$<COMPILE_LANGUAGE:CXX>:-Wshadow>
+    $<$<COMPILE_LANGUAGE:CXX>:-Wconversion>
+)
+
+# Treat warnings as errors only in CI, not locally
+option(WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
+if(WARNINGS_AS_ERRORS)
+    add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Werror>)
+endif()
+
+# --- Sanitizers (for debug/CI builds) ---
+option(ENABLE_SANITIZERS "Build with ASan + UBSan" OFF)
+if(ENABLE_SANITIZERS)
+    set(SAN_FLAGS "-fsanitize=address,undefined -fno-omit-frame-pointer")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${SAN_FLAGS}")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SAN_FLAGS}")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${SAN_FLAGS}")
+endif()
+
 # ONNX Runtime prebuilt binaries
 include(FetchContent)
 set(ORT_VERSION "1.17.1")
@@ -19,7 +43,10 @@ else()
     message(FATAL_ERROR "Unsupported platform. Set ONNXRUNTIME_ROOT manually.")
 endif()
 
-FetchContent_Declare(onnxruntime URL ${ORT_URL})
+FetchContent_Declare(onnxruntime
+    URL ${ORT_URL}
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+)
 FetchContent_MakeAvailable(onnxruntime)
 
 set(ORT_ROOT "${onnxruntime_SOURCE_DIR}")
@@ -44,11 +71,18 @@ set(LIB_SOURCES
 )
 
 add_library(lesion_seg_lib STATIC ${LIB_SOURCES})
+
 target_include_directories(lesion_seg_lib PUBLIC
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/include
     ${ORT_INCLUDE}
 )
+
+# Suppress warnings on vendored C code (znzlib)
+set_source_files_properties(include/znzlib.c PROPERTIES
+    COMPILE_FLAGS "-w"
+)
+
 target_link_libraries(lesion_seg_lib PUBLIC ${ORT_LIB} ZLIB::ZLIB)
 
 # Main binary
