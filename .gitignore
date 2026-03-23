@@ -1,5 +1,3 @@
-//git ignore 
-
 build/
 *.o
 *.onnx
