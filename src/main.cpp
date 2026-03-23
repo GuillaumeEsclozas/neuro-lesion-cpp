@@ -62,10 +62,8 @@ static Config parse_args(int argc, char** argv) {
     return cfg;
 }
 
-// Find _flair, _t1, _t1ce, _t2 nifti files in dir.
-// _t1 match skips anything that already matched _t1ce.
 static std::array<std::string, 4> find_modality_files(const std::string& dir) {
-    std::array<std::string, 4> paths; // [flair, t1, t1ce, t2]
+    std::array<std::string, 4> paths;
 
     for (const auto& entry : fs::directory_iterator(dir)) {
         if (!entry.is_regular_file()) continue;
