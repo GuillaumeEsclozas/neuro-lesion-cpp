@@ -1,182 +1,195 @@
 #include "Postprocessor.h"
-#include <cassert>
 #include <cmath>
-#include <iostream>
+#include <algorithm>
+#include <queue>
 #include <numeric>
 
-#define TEST(name) static void name(); \
-    static struct name##_reg { name##_reg() { tests.push_back({#name, name}); } } name##_inst; \
-    static void name()
+Postprocessor::Postprocessor(int min_component_voxels)
+    : min_component_sz(min_component_voxels) {}
 
-struct TestEntry { const char* name; void(*fn)(); };
-static std::vector<TestEntry> tests;
+std::vector<float> Postprocessor::aggregate_patches(
+    const std::vector<std::vector<float>>& patch_logits,
+    const PatchGrid& grid)
+{
+    size_t C = static_cast<size_t>(grid.num_channels);
+    size_t pD = static_cast<size_t>(grid.padded_d);
+    size_t pH = static_cast<size_t>(grid.padded_h);
+    size_t pW = static_cast<size_t>(grid.padded_w);
+    size_t P = static_cast<size_t>(grid.patch_d);
+    size_t vol_total = C * pD * pH * pW;
 
-static bool approx(float a, float b, float eps = 1e-4f) {
-    return std::fabs(a - b) < eps;
+    std::vector<float> accum(vol_total, 0.0f);
+    std::vector<float> counts(pD * pH * pW, 0.0f);
+
+    for (size_t pi = 0; pi < grid.patches.size(); pi++) {
+        const Patch& patch = grid.patches[pi];
+        const auto& logits = patch_logits[pi];
+        size_t ox = static_cast<size_t>(patch.origin_x);
+        size_t oy = static_cast<size_t>(patch.origin_y);
+        size_t oz = static_cast<size_t>(patch.origin_z);
+
+        for (size_t c = 0; c < C; c++) {
+            for (size_t dz = 0; dz < P; dz++) {
+                for (size_t dy = 0; dy < P; dy++) {
+                    for (size_t dx = 0; dx < P; dx++) {
+                        size_t src_idx = c * P * P * P
+                                       + dz * P * P
+                                       + dy * P + dx;
+
+                        size_t gz = oz + dz, gy = oy + dy, gx = ox + dx;
+                        size_t dst_idx = c * pD * pH * pW
+                                       + gz * pH * pW
+                                       + gy * pW + gx;
+
+                        accum[dst_idx] += logits[src_idx];
+
+                        if (c == 0) {
+                            size_t cnt_idx = gz * pH * pW + gy * pW + gx;
+                            counts[cnt_idx] += 1.0f;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    size_t spatial_padded = pD * pH * pW;
+    for (size_t c = 0; c < C; c++) {
+        for (size_t i = 0; i < spatial_padded; i++) {
+            if (counts[i] > 0.0f) {
+                accum[c * spatial_padded + i] /= counts[i];
+            }
+        }
+    }
+
+    size_t D = static_cast<size_t>(grid.vol_d);
+    size_t H = static_cast<size_t>(grid.vol_h);
+    size_t W = static_cast<size_t>(grid.vol_w);
+    std::vector<float> result(C * D * H * W);
+
+    for (size_t c = 0; c < C; c++) {
+        for (size_t z = 0; z < D; z++) {
+            for (size_t y = 0; y < H; y++) {
+                size_t src_off = c * pD * pH * pW + z * pH * pW + y * pW;
+                size_t dst_off = c * D * H * W + z * H * W + y * W;
+                std::copy(&accum[src_off], &accum[src_off + W], &result[dst_off]);
+            }
+        }
+    }
+
+    return result;
 }
 
-TEST(softmax_uniform) {
-    int C = 4, D = 2, H = 2, W = 2;
+void Postprocessor::softmax_channels(std::vector<float>& probs, int C, int D, int H, int W) {
     size_t spatial = static_cast<size_t>(D) * static_cast<size_t>(H) * static_cast<size_t>(W);
-    std::vector<float> probs(static_cast<size_t>(C) * spatial, 1.0f);
-
-    Postprocessor::softmax_channels(probs, C, D, H, W);
 
     for (size_t i = 0; i < spatial; i++) {
-        float sum = 0;
-        for (size_t c = 0; c < static_cast<size_t>(C); c++) {
-            assert(approx(probs[c * spatial + i], 0.25f));
-            sum += probs[c * spatial + i];
+        float max_val = probs[i];
+        for (int c = 1; c < C; c++) {
+            float v = probs[static_cast<size_t>(c) * spatial + i];
+            if (v > max_val) max_val = v;
         }
-        assert(approx(sum, 1.0f));
-    }
-}
 
-TEST(softmax_dominant_channel) {
-    int C = 3, D = 1, H = 1, W = 1;
-    std::vector<float> probs = {10.0f, 0.0f, 0.0f};
+        float sum_exp = 0.0f;
+        for (int c = 0; c < C; c++) {
+            float e = std::exp(probs[static_cast<size_t>(c) * spatial + i] - max_val);
+            probs[static_cast<size_t>(c) * spatial + i] = e;
+            sum_exp += e;
+        }
 
-    Postprocessor::softmax_channels(probs, C, D, H, W);
-
-    assert(probs[0] > 0.99f);
-    assert(probs[1] < 0.01f);
-    assert(probs[2] < 0.01f);
-    assert(approx(probs[0] + probs[1] + probs[2], 1.0f, 0.001f));
-}
-
-TEST(argmax_basic) {
-    int C = 4, D = 1, H = 2, W = 2;
-    size_t spatial = 4;
-    std::vector<float> probs(static_cast<size_t>(C) * spatial, 0.0f);
-
-    probs[0 * spatial + 0] = 0.9f;
-    probs[1 * spatial + 1] = 0.9f;
-    probs[2 * spatial + 2] = 0.9f;
-    probs[3 * spatial + 3] = 0.9f;
-
-    auto labels = Postprocessor::argmax(probs, C, D, H, W);
-
-    assert(labels[0] == 0);
-    assert(labels[1] == 1);
-    assert(labels[2] == 2);
-    assert(labels[3] == 3);
-}
-
-TEST(filter_removes_tiny_blobs) {
-    int D = 1, H = 4, W = 4;
-    std::vector<int> labels(16, 0);
-
-    labels[0] = 1;
-    labels[1] = 1;
-
-    labels[8]  = 2;
-    labels[9]  = 2;
-    labels[12] = 2;
-    labels[13] = 2;
-
-    Postprocessor::filter_small_components(labels, D, H, W, 3);
-
-    assert(labels[0] == 0);
-    assert(labels[1] == 0);
-
-    assert(labels[8]  == 2);
-    assert(labels[9]  == 2);
-    assert(labels[12] == 2);
-    assert(labels[13] == 2);
-}
-
-TEST(filter_keeps_large_components) {
-    int D = 1, H = 1, W = 10;
-    std::vector<int> labels(10, 1);
-
-    Postprocessor::filter_small_components(labels, D, H, W, 5);
-
-    for (size_t i = 0; i < 10; i++)
-        assert(labels[i] == 1);
-}
-
-TEST(filter_3d_connectivity) {
-    int D = 2, H = 2, W = 2;
-    std::vector<int> labels(8, 0);
-    labels[0] = 1;
-    labels[4] = 1;
-
-    Postprocessor::filter_small_components(labels, D, H, W, 2);
-
-    assert(labels[0] == 1);
-    assert(labels[4] == 1);
-
-    Postprocessor::filter_small_components(labels, D, H, W, 3);
-
-    assert(labels[0] == 0);
-    assert(labels[4] == 0);
-}
-
-TEST(aggregate_single_patch) {
-    PatchGrid grid;
-    grid.patch_d = grid.patch_h = grid.patch_w = 2;
-    grid.num_channels = 2;
-    grid.vol_d = grid.vol_h = grid.vol_w = 2;
-    grid.padded_d = grid.padded_h = grid.padded_w = 2;
-
-    Patch p;
-    p.origin_x = p.origin_y = p.origin_z = 0;
-    p.data.resize(2 * 2 * 2 * 2);
-    std::iota(p.data.begin(), p.data.end(), 1.0f);
-    grid.patches.push_back(p);
-
-    std::vector<std::vector<float>> logits = {p.data};
-    auto result = Postprocessor::aggregate_patches(logits, grid);
-
-    assert(result.size() == 2 * 2 * 2 * 2);
-    for (size_t i = 0; i < result.size(); i++) {
-        assert(approx(result[i], static_cast<float>(i + 1)));
-    }
-}
-
-TEST(filter_single_voxel_component) {
-    int D = 1, H = 3, W = 3;
-    std::vector<int> labels(9, 0);
-    labels[4] = 1;
-
-    Postprocessor::filter_small_components(labels, D, H, W, 2);
-    assert(labels[4] == 0);
-
-    labels[4] = 1;
-    Postprocessor::filter_small_components(labels, D, H, W, 1);
-    assert(labels[4] == 1);
-}
-
-TEST(argmax_single_voxel) {
-    int C = 4, D = 1, H = 1, W = 1;
-    std::vector<float> probs = {0.1f, 0.5f, 0.3f, 0.1f};
-    auto labels = Postprocessor::argmax(probs, C, D, H, W);
-    assert(labels.size() == 1);
-    assert(labels[0] == 1);
-}
-
-TEST(softmax_single_class) {
-    int C = 1, D = 2, H = 2, W = 2;
-    std::vector<float> probs(8, 42.0f);
-    Postprocessor::softmax_channels(probs, C, D, H, W);
-    for (size_t i = 0; i < probs.size(); i++) assert(approx(probs[i], 1.0f));
-}
-
-int main() {
-    int passed = 0, failed = 0;
-    for (auto& t : tests) {
-        try {
-            t.fn();
-            std::cout << "  PASS  " << t.name << "\n";
-            passed++;
-        } catch (const std::exception& e) {
-            std::cout << "  FAIL  " << t.name << ": " << e.what() << "\n";
-            failed++;
-        } catch (...) {
-            std::cout << "  FAIL  " << t.name << " (unknown exception)\n";
-            failed++;
+        float inv_sum = 1.0f / sum_exp;
+        for (int c = 0; c < C; c++) {
+            probs[static_cast<size_t>(c) * spatial + i] *= inv_sum;
         }
     }
-    std::cout << "\n" << passed << " passed, " << failed << " failed\n";
-    return failed > 0 ? 1 : 0;
+}
+
+std::vector<int> Postprocessor::argmax(const std::vector<float>& probs, int C, int D, int H, int W) {
+    size_t spatial = static_cast<size_t>(D) * static_cast<size_t>(H) * static_cast<size_t>(W);
+    std::vector<int> labels(spatial);
+
+    for (size_t i = 0; i < spatial; i++) {
+        int best = 0;
+        float best_val = probs[i];
+        for (int c = 1; c < C; c++) {
+            float v = probs[static_cast<size_t>(c) * spatial + i];
+            if (v > best_val) {
+                best_val = v;
+                best = c;
+            }
+        }
+        labels[i] = best;
+    }
+
+    return labels;
+}
+
+void Postprocessor::filter_small_components(std::vector<int>& labels,
+                                             int D, int H, int W, int min_size)
+{
+    size_t total = static_cast<size_t>(D) * static_cast<size_t>(H) * static_cast<size_t>(W);
+    std::vector<bool> visited(total, false);
+
+    const int ddx[] = {-1, 1,  0, 0,  0, 0};
+    const int ddy[] = { 0, 0, -1, 1,  0, 0};
+    const int ddz[] = { 0, 0,  0, 0, -1, 1};
+
+    auto idx = [&](int x, int y, int z) -> size_t {
+        return static_cast<size_t>(z) * static_cast<size_t>(H) * static_cast<size_t>(W)
+             + static_cast<size_t>(y) * static_cast<size_t>(W)
+             + static_cast<size_t>(x);
+    };
+
+    std::queue<std::array<int,3>> bfs_queue;
+
+    for (int z = 0; z < D; z++) {
+        for (int y = 0; y < H; y++) {
+            for (int x = 0; x < W; x++) {
+                size_t i = idx(x, y, z);
+                if (visited[i] || labels[i] == 0) continue;
+
+                int lbl = labels[i];
+                std::vector<size_t> component;
+                bfs_queue.push({x, y, z});
+                visited[i] = true;
+
+                while (!bfs_queue.empty()) {
+                    auto [cx, cy, cz] = bfs_queue.front();
+                    bfs_queue.pop();
+                    component.push_back(idx(cx, cy, cz));
+
+                    for (int d = 0; d < 6; d++) {
+                        int nx = cx + ddx[d], ny = cy + ddy[d], nz = cz + ddz[d];
+                        if (nx < 0 || nx >= W || ny < 0 || ny >= H || nz < 0 || nz >= D)
+                            continue;
+                        size_t ni = idx(nx, ny, nz);
+                        if (!visited[ni] && labels[ni] == lbl) {
+                            visited[ni] = true;
+                            bfs_queue.push({nx, ny, nz});
+                        }
+                    }
+                }
+
+                if (static_cast<int>(component.size()) < min_size) {
+                    for (size_t ci : component)
+                        labels[ci] = 0;
+                }
+            }
+        }
+    }
+}
+
+std::vector<int> Postprocessor::run(const std::vector<std::vector<float>>& patch_logits,
+                                     const PatchGrid& grid)
+{
+    auto logits = aggregate_patches(patch_logits, grid);
+
+    int C = grid.num_channels;
+    int D = grid.vol_d, H = grid.vol_h, W = grid.vol_w;
+
+    softmax_channels(logits, C, D, H, W);
+    auto labels = argmax(logits, C, D, H, W);
+    filter_small_components(labels, D, H, W, min_component_sz);
+
+    return labels;
 }
