@@ -61,10 +61,10 @@ The model itself gets ~0.73 mean Dice on the full validation split
 ~7 min per volume on CPU (Xeon @ 2.2GHz, single thread).
 
 ## Tests
-
-    cd build
-    ./test_preprocessor
-    ./test_postprocessor
+```bash
+cd build
+./test_preprocessor
+./test_postprocessor
 ```
 
 ## References
