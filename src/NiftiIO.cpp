@@ -100,7 +100,7 @@ NiftiVolume nifti::load(const std::string& filepath) {
     int nx = hdr.dim[1];
     int ny = hdr.dim[2];
     int nz = hdr.dim[3];
-    size_t nvox = (size_t)nx * ny * nz;
+    size_t nvox = static_cast<size_t>(nx) * static_cast<size_t>(ny) * static_cast<size_t>(nz);
 
     int bpv = bytes_per_voxel(hdr.datatype);
     if (bpv == 0) {
@@ -108,8 +108,8 @@ NiftiVolume nifti::load(const std::string& filepath) {
         throw std::runtime_error("Unsupported datatype in: " + filepath);
     }
 
-    std::vector<char> rawbuf(nvox * bpv);
-    size_t got = znzread(rawbuf.data(), bpv, nvox, fp);
+    std::vector<char> rawbuf(nvox * static_cast<size_t>(bpv));
+    size_t got = znzread(rawbuf.data(), static_cast<size_t>(bpv), nvox, fp);
     znzclose(fp);
 
     if (got != nvox)
