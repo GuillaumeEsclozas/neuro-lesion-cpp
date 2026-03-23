@@ -5,11 +5,8 @@
 #include <memory>
 #include <onnxruntime_cxx_api.h>
 
-/*
- * Wraps the ONNX Runtime session lifecycle. Supports CPU and CUDA execution
- * providers. Feed it [batch, 4, 128, 128, 128] patches, get back
- * [batch, 4, 128, 128, 128] logits.
- */
+// ONNX Runtime wrapper. Takes [C,D,H,W] patches, returns raw logits.
+
 class InferenceEngine {
 public:
     InferenceEngine(const std::string& model_path, const std::string& device);
