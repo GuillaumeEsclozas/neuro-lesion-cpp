@@ -12,7 +12,6 @@ env:
 
 jobs:
 
-  # ── Main build: gcc + clang matrix ──────────────────────────
   build:
     strategy:
       fail-fast: false
@@ -67,7 +66,6 @@ jobs:
           path: build/brain_lesion_seg
           retention-days: 30
 
-  # ── Sanitizer build: catch memory bugs ──────────────────────
   sanitizers:
     runs-on: ubuntu-latest
     name: build / asan+ubsan
