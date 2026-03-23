@@ -1,67 +1,8 @@
-import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
-import nibabel as nib
-import numpy as np
-
-# Load data for subject 001
-subj_dir = "/content/brats20/BraTS2020_TrainingData/MICCAI_BraTS2020_TrainingData/BraTS20_Training_001"
-t1ce = nib.load(f"{subj_dir}/BraTS20_Training_001_t1ce.nii").get_fdata()
-gt = nib.load(f"{subj_dir}/BraTS20_Training_001_seg.nii").get_fdata()
-pred = nib.load("/content/output_seg_001.nii").get_fdata()
-
-# Remap GT label 4 -> 3
-gt[gt == 4] = 3
-
-# Pick a good axial slice (where tumor is visible)
-tumor_counts = [np.sum(gt[:,:,z] > 0) for z in range(gt.shape[2])]
-best_slice = np.argmax(tumor_counts)
-
-# Color map: 1=red (NCR/NET), 2=green (edema), 3=yellow (enhancing)
-colors = {1: [1, 0, 0], 2: [0, 1, 0], 3: [1, 1, 0]}
-
-def overlay(mri_slice, seg_slice, alpha=0.4):
-    mri_norm = (mri_slice - mri_slice.min()) / (mri_slice.max() - mri_slice.min() + 1e-8)
-    rgb = np.stack([mri_norm]*3, axis=-1)
-    for label, color in colors.items():
-        mask = seg_slice == label
-        for c in range(3):
-            rgb[:,:,c] = np.where(mask, rgb[:,:,c]*(1-alpha) + color[c]*alpha, rgb[:,:,c])
-    return rgb
-
-fig, axes = plt.subplots(1, 2, figsize=(10, 5), facecolor='black')
-
-axes[0].imshow(overlay(t1ce[:,:,best_slice], gt[:,:,best_slice]).T, origin='lower')
-axes[0].set_title("Ground Truth", color='white', fontsize=12)
-axes[0].axis('off')
-
-axes[1].imshow(overlay(t1ce[:,:,best_slice], pred[:,:,best_slice]).T, origin='lower')
-axes[1].set_title("C++ Pipeline Output", color='white', fontsize=12)
-axes[1].axis('off')
-
-legend_patches = [
-    mpatches.Patch(color=[1,0,0], label='NCR/NET'),
-    mpatches.Patch(color=[0,1,0], label='Edema'),
-    mpatches.Patch(color=[1,1,0], label='Enhancing'),
-]
-fig.legend(handles=legend_patches, loc='lower center', ncol=3,
-           facecolor='black', edgecolor='white', labelcolor='white', fontsize=10)
-
-plt.tight_layout(rect=[0, 0.08, 1, 1])
-plt.savefig("/content/neuro-lesion-cpp/segmentation_example.png", dpi=150, bbox_inches='tight',
-            facecolor='black', edgecolor='none')
-plt.show()
-print("Saved to /content/neuro-lesion-cpp/segmentation_example.png")
-```
-
-Une fois la figure générée, télécharge la (`segmentation_example.png`), puis upload la sur ton repo GitHub: va dans le repo → Add file → Upload files → drop le PNG → commit.
-
-Ensuite, remplace tout le README.md sur GitHub (edit dans le browser) par ceci:
-```
 # neuro-lesion-cpp
 
 C++ inference pipeline for 3D brain lesion segmentation from multi-modal MRI. Takes four NIfTI volumes (FLAIR, T1, T1ce, T2) and an ONNX model, produces a segmentation mask in NIfTI format. Built for BraTS 2020 conventions.
 
-![Segmentation example](brain.png)
+![Segmentation example](segmentation_example.png)
 
 ## Dependencies
 
