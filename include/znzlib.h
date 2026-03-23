@@ -4,6 +4,10 @@
 #include <stdio.h>
 #include <zlib.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct znzFile_s {
     int withz;
     FILE* nzfptr;
@@ -18,5 +22,9 @@ long    znztell(znzFile f);
 int     znzseek(znzFile f, long offset, int whence);
 int     znzeof(znzFile f);
 int     znz_isnull(znzFile f);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
