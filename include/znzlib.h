@@ -1,7 +1,6 @@
 /*
- * znzlib.h - transparent gzip I/O wrapper
- * Vendored from NIFTI-Imaging/nifti_clib.
- * Provides a uniform API for reading both .nii and .nii.gz files.
+ * znzlib.h
+ * gzip-transparent I/O, from nifti_clib.
  */
 
 #ifndef ZNZLIB_H
@@ -16,9 +15,9 @@ extern "C" {
 #endif
 
 struct znzFile_s {
-    FILE*  nzfptr;   /* for uncompressed files */
-    gzFile zfptr;    /* for gzip-compressed files */
-    int    withz;    /* nonzero if using gzip */
+    FILE*  nzfptr;
+    gzFile zfptr;
+    int    withz;
 };
 
 typedef struct znzFile_s* znzFile;
