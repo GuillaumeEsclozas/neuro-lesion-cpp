@@ -1,0 +1,7 @@
+build/
+*.o
+*.onnx
+*.nii
+*.nii.gz
+.vscode/
+CMakeUserPresets.json
