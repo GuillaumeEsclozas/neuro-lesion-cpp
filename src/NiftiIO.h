@@ -20,8 +20,16 @@ struct NiftiVolume {
     float qoffset_x = 0, qoffset_y = 0, qoffset_z = 0;
 
     inline size_t nvoxels() const { return (size_t)nx * ny * nz; }
-    inline float& at(int x, int y, int z) { return data[(size_t)z * ny * nx + (size_t)y * nx + x]; }
-    inline float  at(int x, int y, int z) const { return data[(size_t)z * ny * nx + (size_t)y * nx + x]; }
+    inline float& at(int x, int y, int z) {
+        return data[static_cast<size_t>(z) * static_cast<size_t>(ny) * static_cast<size_t>(nx)
+                   + static_cast<size_t>(y) * static_cast<size_t>(nx)
+                   + static_cast<size_t>(x)];
+    }
+    inline float at(int x, int y, int z) const {
+        return data[static_cast<size_t>(z) * static_cast<size_t>(ny) * static_cast<size_t>(nx)
+                   + static_cast<size_t>(y) * static_cast<size_t>(nx)
+                   + static_cast<size_t>(x)];
+    }
 };
 
 namespace nifti {
