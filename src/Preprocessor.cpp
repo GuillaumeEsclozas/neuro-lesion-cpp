@@ -16,15 +16,15 @@ void Preprocessor::zscore_normalize(NiftiVolume& vol) {
         float v = vol.data[i];
         if (v != 0.0f) {
             sum += v;
-            sum_sq += (double)v * v;
+            sum_sq += static_cast<double>(v) * v;
             count++;
         }
     }
 
     if (count < 2) return;
 
-    double mean = sum / count;
-    double variance = (sum_sq / count) - (mean * mean);
+    double mean = sum / static_cast<double>(count);
+    double variance = (sum_sq / static_cast<double>(count)) - (mean * mean);
     double std_dev = std::sqrt(std::max(variance, 1e-8));
 
     for (size_t i = 0; i < vol.data.size(); i++) {
@@ -41,11 +41,12 @@ std::vector<float> Preprocessor::stack_modalities(const std::array<NiftiVolume, 
             throw std::runtime_error("Modality dimension mismatch at channel " + std::to_string(c));
     }
 
-    size_t vol_size = (size_t)nx * ny * nz;
+    size_t vol_size = static_cast<size_t>(nx) * static_cast<size_t>(ny) * static_cast<size_t>(nz);
     std::vector<float> stacked(4 * vol_size);
 
     for (int c = 0; c < 4; c++) {
-        std::copy(vols[c].data.begin(), vols[c].data.end(), stacked.begin() + c * vol_size);
+        std::copy(vols[c].data.begin(), vols[c].data.end(),
+                  stacked.begin() + static_cast<ptrdiff_t>(static_cast<size_t>(c) * vol_size));
     }
 
     return stacked;
@@ -54,7 +55,7 @@ std::vector<float> Preprocessor::stack_modalities(const std::array<NiftiVolume, 
 PatchGrid Preprocessor::extract_patches(const std::vector<float>& stacked,
                                          int channels, int D, int H, int W)
 {
-    int step = std::max(1, static_cast<int>(patch_sz * (1.0f - overlap_frac)));
+    int step = std::max(1, static_cast<int>(static_cast<float>(patch_sz) * (1.0f - overlap_frac)));
 
     auto pad_dim = [&](int orig) -> int {
         if (orig <= patch_sz) return patch_sz;
@@ -66,13 +67,21 @@ PatchGrid Preprocessor::extract_patches(const std::vector<float>& stacked,
     int pH = pad_dim(H);
     int pW = pad_dim(W);
 
-    std::vector<float> padded((size_t)channels * pD * pH * pW, 0.0f);
+    size_t sD = static_cast<size_t>(pD);
+    size_t sH = static_cast<size_t>(pH);
+    size_t sW = static_cast<size_t>(pW);
+
+    std::vector<float> padded(static_cast<size_t>(channels) * sD * sH * sW, 0.0f);
 
     for (int c = 0; c < channels; c++) {
         for (int z = 0; z < D; z++) {
             for (int y = 0; y < H; y++) {
-                const float* src_row = &stacked[(size_t)c * D * H * W + (size_t)z * H * W + (size_t)y * W];
-                float* dst_row = &padded[(size_t)c * pD * pH * pW + (size_t)z * pH * pW + (size_t)y * pW];
+                const float* src_row = &stacked[static_cast<size_t>(c) * static_cast<size_t>(D) * static_cast<size_t>(H) * static_cast<size_t>(W)
+                                               + static_cast<size_t>(z) * static_cast<size_t>(H) * static_cast<size_t>(W)
+                                               + static_cast<size_t>(y) * static_cast<size_t>(W)];
+                float* dst_row = &padded[static_cast<size_t>(c) * sD * sH * sW
+                                        + static_cast<size_t>(z) * sH * sW
+                                        + static_cast<size_t>(y) * sW];
                 std::copy(src_row, src_row + W, dst_row);
             }
         }
@@ -90,7 +99,8 @@ PatchGrid Preprocessor::extract_patches(const std::vector<float>& stacked,
     grid.padded_h = pH;
     grid.padded_w = pW;
 
-    size_t patch_vol = (size_t)channels * patch_sz * patch_sz * patch_sz;
+    size_t P = static_cast<size_t>(patch_sz);
+    size_t patch_vol = static_cast<size_t>(channels) * P * P * P;
 
     for (int z = 0; z <= pD - patch_sz; z += step) {
         for (int y = 0; y <= pH - patch_sz; y += step) {
@@ -104,14 +114,14 @@ PatchGrid Preprocessor::extract_patches(const std::vector<float>& stacked,
                 for (int c = 0; c < channels; c++) {
                     for (int dz = 0; dz < patch_sz; dz++) {
                         for (int dy = 0; dy < patch_sz; dy++) {
-                            size_t src_off = (size_t)c * pD * pH * pW
-                                           + (size_t)(z + dz) * pH * pW
-                                           + (size_t)(y + dy) * pW
-                                           + x;
-                            size_t dst_off = (size_t)c * patch_sz * patch_sz * patch_sz
-                                           + (size_t)dz * patch_sz * patch_sz
-                                           + (size_t)dy * patch_sz;
-                            std::copy(&padded[src_off], &padded[src_off + patch_sz],
+                            size_t src_off = static_cast<size_t>(c) * sD * sH * sW
+                                           + static_cast<size_t>(z + dz) * sH * sW
+                                           + static_cast<size_t>(y + dy) * sW
+                                           + static_cast<size_t>(x);
+                            size_t dst_off = static_cast<size_t>(c) * P * P * P
+                                           + static_cast<size_t>(dz) * P * P
+                                           + static_cast<size_t>(dy) * P;
+                            std::copy(&padded[src_off], &padded[src_off + P],
                                       &p.data[dst_off]);
                         }
                     }
