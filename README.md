@@ -2,7 +2,7 @@
 
 C++ inference pipeline for 3D brain lesion segmentation from multi-modal MRI. Takes four NIfTI volumes (FLAIR, T1, T1ce, T2) and an ONNX model, produces a segmentation mask in NIfTI format. Built for BraTS 2020 conventions.
 
-![Segmentation example](images/brain.png)
+![Segmentation example](image/brain.png)
 
 ## Dependencies
 
