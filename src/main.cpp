@@ -62,11 +62,8 @@ static Config parse_args(int argc, char** argv) {
     return cfg;
 }
 
-/*
- * Locate the four BraTS modality files in the input directory.
- * Looks for filenames containing _flair, _t1ce, _t1, _t2 (case-insensitive).
- * The _t1 match must not also match _t1ce to avoid ambiguity.
- */
+// Find _flair, _t1, _t1ce, _t2 nifti files in dir.
+// _t1 match skips anything that already matched _t1ce.
 static std::array<std::string, 4> find_modality_files(const std::string& dir) {
     std::array<std::string, 4> paths; // [flair, t1, t1ce, t2]
 
@@ -74,11 +71,9 @@ static std::array<std::string, 4> find_modality_files(const std::string& dir) {
         if (!entry.is_regular_file()) continue;
         std::string fname = entry.path().filename().string();
 
-        // lowercase copy for matching
         std::string lower = fname;
         std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
 
-        // Must be a nifti file
         if (lower.find(".nii") == std::string::npos) continue;
 
         if (lower.find("_flair") != std::string::npos) {
@@ -88,7 +83,6 @@ static std::array<std::string, 4> find_modality_files(const std::string& dir) {
         } else if (lower.find("_t2") != std::string::npos) {
             paths[3] = entry.path().string();
         } else if (lower.find("_t1") != std::string::npos) {
-            // match _t1 only if _t1ce didn't already claim this file
             paths[1] = entry.path().string();
         }
     }
@@ -109,7 +103,6 @@ int main(int argc, char** argv) {
 
     auto wall_start = std::chrono::steady_clock::now();
 
-    // 1. Locate and load the four modalities
     std::cerr << "Scanning " << cfg.input_dir << " for modality files...\n";
     auto mod_paths = find_modality_files(cfg.input_dir);
 
@@ -123,13 +116,11 @@ int main(int argc, char** argv) {
     std::cerr << "Volume dimensions: " << volumes[0].nx << " x " << volumes[0].ny
               << " x " << volumes[0].nz << "\n";
 
-    // 2. Preprocess: normalize and extract patches
     Preprocessor preproc(128, cfg.patch_overlap);
     auto grid = preproc.run(volumes);
     std::cerr << "Extracted " << grid.patches.size() << " patches ("
               << grid.patch_d << "^3, overlap=" << cfg.patch_overlap << ")\n";
 
-    // 3. Run inference on each patch
     InferenceEngine engine(cfg.model_path, cfg.device);
     std::vector<std::vector<float>> all_logits;
     all_logits.reserve(grid.patches.size());
@@ -143,11 +134,9 @@ int main(int argc, char** argv) {
     }
     std::cerr << "\n";
 
-    // 4. Postprocess: aggregate, softmax, argmax, filter
     Postprocessor postproc(cfg.min_component_size);
     auto labels = postproc.run(all_logits, grid);
 
-    // 5. Save output segmentation mask
     nifti::save_labels(cfg.output_path, labels, volumes[0]);
 
     auto wall_end = std::chrono::steady_clock::now();
