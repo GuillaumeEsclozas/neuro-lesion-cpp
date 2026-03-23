@@ -8,7 +8,6 @@ Preprocessor::Preprocessor(int patch_size, float overlap)
     : patch_sz(patch_size), overlap_frac(overlap) {}
 
 void Preprocessor::zscore_normalize(NiftiVolume& vol) {
-    // Compute mean and std over nonzero voxels only (standard BraTS practice)
     double sum = 0.0;
     double sum_sq = 0.0;
     size_t count = 0;
@@ -22,7 +21,7 @@ void Preprocessor::zscore_normalize(NiftiVolume& vol) {
         }
     }
 
-    if (count < 2) return; // degenerate volume, nothing to normalize
+    if (count < 2) return;
 
     double mean = sum / count;
     double variance = (sum_sq / count) - (mean * mean);
@@ -32,7 +31,6 @@ void Preprocessor::zscore_normalize(NiftiVolume& vol) {
         if (vol.data[i] != 0.0f) {
             vol.data[i] = static_cast<float>((vol.data[i] - mean) / std_dev);
         }
-        // zero voxels stay zero (background)
     }
 }
 
@@ -46,7 +44,6 @@ std::vector<float> Preprocessor::stack_modalities(const std::array<NiftiVolume, 
     size_t vol_size = (size_t)nx * ny * nz;
     std::vector<float> stacked(4 * vol_size);
 
-    // layout: [C, D(=nz), H(=ny), W(=nx)]
     for (int c = 0; c < 4; c++) {
         std::copy(vols[c].data.begin(), vols[c].data.end(), stacked.begin() + c * vol_size);
     }
@@ -59,11 +56,8 @@ PatchGrid Preprocessor::extract_patches(const std::vector<float>& stacked,
 {
     int step = std::max(1, static_cast<int>(patch_sz * (1.0f - overlap_frac)));
 
-    // Pad volume dimensions up to a multiple of patch_sz if needed, or at
-    // least ensure we can cover the whole thing with our stride pattern.
     auto pad_dim = [&](int orig) -> int {
         if (orig <= patch_sz) return patch_sz;
-        // enough room so the last patch starting position + patch_sz covers orig
         int n_patches = (orig - patch_sz + step - 1) / step + 1;
         return (n_patches - 1) * step + patch_sz;
     };
@@ -72,7 +66,6 @@ PatchGrid Preprocessor::extract_patches(const std::vector<float>& stacked,
     int pH = pad_dim(H);
     int pW = pad_dim(W);
 
-    // Create zero-padded version of the stacked tensor
     std::vector<float> padded((size_t)channels * pD * pH * pW, 0.0f);
 
     for (int c = 0; c < channels; c++) {
@@ -133,7 +126,6 @@ PatchGrid Preprocessor::extract_patches(const std::vector<float>& stacked,
 }
 
 PatchGrid Preprocessor::run(const std::array<NiftiVolume, 4>& modalities) {
-    // Work on copies so we don't mutate the caller's data
     auto vols = modalities;
 
     for (auto& v : vols)
