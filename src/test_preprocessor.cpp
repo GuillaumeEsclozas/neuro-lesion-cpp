@@ -170,7 +170,7 @@ TEST(stacking_preserves_channels) {
     assert(stacked.size() == 4 * 8);
 
     for (int c = 0; c < 4; c++) {
-        float expected = (c + 1) * 100.0f;
+        float expected = static_cast<float>(c + 1) * 100.0f;
         for (int i = 0; i < 8; i++) {
             assert(stacked[c * 8 + i] == expected);
         }
