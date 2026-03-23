@@ -5,11 +5,8 @@
 #include <array>
 #include <cstdint>
 
-/*
- * NiftiVolume holds a 3D volume as a flat float buffer in row-major order (x fastest).
- * Keeps the original header around so we can write output files that preserve
- * the spatial metadata (sform, qform, voxel dimensions, etc).
- */
+// 3D volume as flat float array (x fastest). Stores sform/qform for output.
+
 struct NiftiVolume {
     std::vector<float> data;
     int nx = 0, ny = 0, nz = 0;           /* voxel dimensions */
