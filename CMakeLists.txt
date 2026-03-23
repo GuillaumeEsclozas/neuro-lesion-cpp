@@ -75,6 +75,8 @@ add_library(lesion_seg_lib STATIC ${LIB_SOURCES})
 target_include_directories(lesion_seg_lib PUBLIC
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/include
+)
+target_include_directories(lesion_seg_lib SYSTEM PUBLIC
     ${ORT_INCLUDE}
 )
 
