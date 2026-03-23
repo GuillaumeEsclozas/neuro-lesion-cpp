@@ -17,14 +17,14 @@ static bool approx(float a, float b, float eps = 1e-4f) {
 
 TEST(softmax_uniform) {
     int C = 4, D = 2, H = 2, W = 2;
-    size_t spatial = D * H * W;
-    std::vector<float> probs(C * spatial, 1.0f);
+    size_t spatial = static_cast<size_t>(D) * static_cast<size_t>(H) * static_cast<size_t>(W);
+    std::vector<float> probs(static_cast<size_t>(C) * spatial, 1.0f);
 
     Postprocessor::softmax_channels(probs, C, D, H, W);
 
     for (size_t i = 0; i < spatial; i++) {
         float sum = 0;
-        for (int c = 0; c < C; c++) {
+        for (size_t c = 0; c < static_cast<size_t>(C); c++) {
             assert(approx(probs[c * spatial + i], 0.25f));
             sum += probs[c * spatial + i];
         }
@@ -47,7 +47,7 @@ TEST(softmax_dominant_channel) {
 TEST(argmax_basic) {
     int C = 4, D = 1, H = 2, W = 2;
     size_t spatial = 4;
-    std::vector<float> probs(C * spatial, 0.0f);
+    std::vector<float> probs(static_cast<size_t>(C) * spatial, 0.0f);
 
     probs[0 * spatial + 0] = 0.9f;
     probs[1 * spatial + 1] = 0.9f;
@@ -66,11 +66,9 @@ TEST(filter_removes_tiny_blobs) {
     int D = 1, H = 4, W = 4;
     std::vector<int> labels(16, 0);
 
-    // 2 voxel blob
     labels[0] = 1;
     labels[1] = 1;
 
-    // 4 voxel blob
     labels[8]  = 2;
     labels[9]  = 2;
     labels[12] = 2;
@@ -93,15 +91,15 @@ TEST(filter_keeps_large_components) {
 
     Postprocessor::filter_small_components(labels, D, H, W, 5);
 
-    for (int i = 0; i < 10; i++)
+    for (size_t i = 0; i < 10; i++)
         assert(labels[i] == 1);
 }
 
 TEST(filter_3d_connectivity) {
     int D = 2, H = 2, W = 2;
     std::vector<int> labels(8, 0);
-    labels[0] = 1; // z=0
-    labels[4] = 1; // z=1, connected through z
+    labels[0] = 1;
+    labels[4] = 1;
 
     Postprocessor::filter_small_components(labels, D, H, W, 2);
 
@@ -161,7 +159,7 @@ TEST(softmax_single_class) {
     int C = 1, D = 2, H = 2, W = 2;
     std::vector<float> probs(8, 42.0f);
     Postprocessor::softmax_channels(probs, C, D, H, W);
-    for (auto v : probs) assert(approx(v, 1.0f));
+    for (size_t i = 0; i < probs.size(); i++) assert(approx(probs[i], 1.0f));
 }
 
 int main() {
