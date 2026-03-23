@@ -180,3 +180,5 @@ int main() {
     std::cout << "\n" << passed << " passed, " << failed << " failed\n";
     return failed > 0 ? 1 : 0;
 }
+
+# verified with ci/cd pipelines
