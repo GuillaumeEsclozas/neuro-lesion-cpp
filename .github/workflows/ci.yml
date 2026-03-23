@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+env:
+  ORT_VERSION: "1.17.1"
+  BUILD_TYPE: Release
+
+jobs:
+
+  # ── Main build: gcc + clang matrix ──────────────────────────
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: gcc-13
+            cc: gcc-13
+            cxx: g++-13
+            pkg: ""
+          - name: clang-17
+            cc: clang-17
+            cxx: clang++-17
+            pkg: clang-17
+
+    runs-on: ubuntu-latest
+    name: build / ${{ matrix.name }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q zlib1g-dev ${{ matrix.pkg }}
+
+      - name: Cache ORT
+        uses: actions/cache@v4
+        with:
+          path: build/_deps/onnxruntime-src
+          key: ort-${{ env.ORT_VERSION }}-linux-x64
+
+      - name: Configure
+        run: |
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+            -DCMAKE_C_COMPILER=${{ matrix.cc }} \
+            -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} \
+            -DWARNINGS_AS_ERRORS=ON
+
+      - name: Build
+        run: cmake --build build --parallel $(nproc)
+
+      - name: Test
+        working-directory: build
+        run: ctest --output-on-failure --timeout 120
+
+      - name: Upload binary
+        if: matrix.name == 'gcc-13'
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain_lesion_seg-linux-x64
+          path: build/brain_lesion_seg
+          retention-days: 30
+
+  # ── Sanitizer build: catch memory bugs ──────────────────────
+  sanitizers:
+    runs-on: ubuntu-latest
+    name: build / asan+ubsan
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q zlib1g-dev
+
+      - name: Cache ORT
+        uses: actions/cache@v4
+        with:
+          path: build/_deps/onnxruntime-src
+          key: ort-${{ env.ORT_VERSION }}-linux-x64
+
+      - name: Configure
+        run: |
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_C_COMPILER=gcc-13 \
+            -DCMAKE_CXX_COMPILER=g++-13 \
+            -DENABLE_SANITIZERS=ON
+
+      - name: Build
+        run: cmake --build build --parallel $(nproc)
+
+      - name: Test under sanitizers
+        working-directory: build
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+        run: ctest --output-on-failure --timeout 180
