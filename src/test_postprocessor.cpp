@@ -181,4 +181,3 @@ int main() {
     return failed > 0 ? 1 : 0;
 }
 
-# verified with ci/cd pipelines
