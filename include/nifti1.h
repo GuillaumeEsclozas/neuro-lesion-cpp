@@ -1,7 +1,6 @@
 /*
- * nifti1.h - NIfTI-1 format header definitions
- * Vendored from NIFTI-Imaging/nifti_clib with minimal modifications.
- * Only the structures and constants needed for reading/writing .nii files.
+ * nifti1.h
+ * Stripped-down NIfTI-1 header definitions from nifti_clib.
  */
 
 #ifndef NIFTI1_H
@@ -9,11 +8,9 @@
 
 #include <cstdint>
 
-/* NIfTI-1 magic strings */
 #define NII_SINGLE_MAGIC "n+1\0"
 #define NII_PAIR_MAGIC   "ni1\0"
 
-/* Data type codes */
 #define DT_UNKNOWN    0
 #define DT_UINT8      2
 #define DT_INT16      4
@@ -24,24 +21,21 @@
 #define DT_UINT16   512
 #define DT_UINT32   768
 
-/* NIfTI intent codes (subset) */
 #define NIFTI_INTENT_NONE    0
 #define NIFTI_INTENT_LABEL 1002
 
-/* Transform codes */
 #define NIFTI_XFORM_UNKNOWN      0
 #define NIFTI_XFORM_SCANNER_ANAT 1
 #define NIFTI_XFORM_ALIGNED_ANAT 2
 #define NIFTI_XFORM_TALAIRACH    3
 #define NIFTI_XFORM_MNI_152      4
 
-/* Units codes */
 #define NIFTI_UNITS_MM   2
 #define NIFTI_UNITS_SEC  8
 
 #pragma pack(push, 1)
 struct nifti_1_header {
-    int32_t   sizeof_hdr;    /* must be 348 */
+    int32_t   sizeof_hdr;
     char      data_type[10];
     char      db_name[18];
     int32_t   extents;
