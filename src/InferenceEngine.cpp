@@ -12,7 +12,7 @@ InferenceEngine::InferenceEngine(const std::string& model_path, const std::strin
         OrtCUDAProviderOptions cuda_opts{};
         cuda_opts.device_id = 0;
         cuda_opts.arena_extend_strategy = 0;
-        cuda_opts.cudnn_conv_algo_search = OrtCudnnDefaultConvAlgoSearch;
+        cuda_opts.cudnn_conv_algo_search = OrtCudnnConvAlgoSearchDefault;
         cuda_opts.do_copy_in_default_stream = 1;
         session_opts.AppendExecutionProvider_CUDA(cuda_opts);
         std::cerr << "[InferenceEngine] Using CUDA execution provider\n";
