@@ -100,3 +100,9 @@ B.H. Menze et al. The Multimodal Brain Tumor Image Segmentation Benchmark (BraTS
 ## License
 
 Pipeline code is provided as is. The ONNX model and training data are subject to the BraTS 2020 challenge license terms.
+
+## Limits to this repo
+
+Tested on 5 BraTS 2020 **training** subjects to verify C++ pipeline correctness against the Python reference. For model performance on unseen data, see the validation results in `training/` (mean foreground Dice 0.7317 on the full validation set).
+
+
